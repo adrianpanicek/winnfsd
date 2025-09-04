@@ -568,7 +568,7 @@ nfsstat3 CNFS3Prog::ProcedureREADLINK(void)
 
     HANDLE hFile;
     REPARSE_DATA_BUFFER *lpOutBuffer;
-    lpOutBuffer = (REPARSE_DATA_BUFFER*)malloc(MAXIMUM_REPARSE_DATA_BUFFER_SIZE);
+    lpOutBuffer = (REPARSE_DATA_BUFFER*) calloc(1, MAXIMUM_REPARSE_DATA_BUFFER_SIZE);
     DWORD bytesReturned;
 
     bool validHandle = GetPath(path);
@@ -583,24 +583,26 @@ nfsstat3 CNFS3Prog::ProcedureREADLINK(void)
         }
         else
         {
-            lpOutBuffer = (REPARSE_DATA_BUFFER*)malloc(MAXIMUM_REPARSE_DATA_BUFFER_SIZE);
             if (!lpOutBuffer) {
                 stat = NFS3ERR_IO;
             }
             else {
                 DeviceIoControl(hFile, FSCTL_GET_REPARSE_POINT, NULL, 0, lpOutBuffer, MAXIMUM_REPARSE_DATA_BUFFER_SIZE, &bytesReturned, NULL);
                 std::string finalSymlinkPath;
-                if (lpOutBuffer->ReparseTag == IO_REPARSE_TAG_SYMLINK || lpOutBuffer->ReparseTag == IO_REPARSE_TAG_MOUNT_POINT)
-                {
-                    if (lpOutBuffer->ReparseTag == IO_REPARSE_TAG_SYMLINK)
-                    {
-                        size_t plen = lpOutBuffer->SymbolicLinkReparseBuffer.PrintNameLength / sizeof(WCHAR);
-                        WCHAR *szPrintName = new WCHAR[plen + 1];
-                        wcsncpy_s(szPrintName, plen + 1, &lpOutBuffer->SymbolicLinkReparseBuffer.PathBuffer[lpOutBuffer->SymbolicLinkReparseBuffer.PrintNameOffset / sizeof(WCHAR)], plen);
-                        szPrintName[plen] = 0;
-                        std::wstring wStringTemp(szPrintName);
-                        delete[] szPrintName;
-                        std::string cPrintName(wStringTemp.begin(), wStringTemp.end());
+                std::wstring wStringTemp;
+                std::string cPrintName;
+                size_t nlen = 0;
+                WCHAR* szName;
+
+                switch (lpOutBuffer->ReparseTag) {
+                    case IO_REPARSE_TAG_SYMLINK:
+                        nlen = lpOutBuffer->SymbolicLinkReparseBuffer.PrintNameLength / sizeof(WCHAR);
+                        szName = new WCHAR[nlen + 1];
+                        wcsncpy_s(szName, nlen + 1, &lpOutBuffer->SymbolicLinkReparseBuffer.PathBuffer[lpOutBuffer->SymbolicLinkReparseBuffer.PrintNameOffset / sizeof(WCHAR)], nlen);
+                        szName[nlen] = 0;
+                        wStringTemp.append(szName);
+                        delete[] szName;
+                        cPrintName.append(wStringTemp.begin(), wStringTemp.end());
                         finalSymlinkPath.assign(cPrintName);
                         // TODO: Revisit with cleaner solution
                         if (!PathIsRelative(cPrintName.c_str()))
@@ -619,17 +621,23 @@ nfsstat3 CNFS3Prog::ProcedureREADLINK(void)
                             std::string symlinkPath(szOut);
                             finalSymlinkPath.assign(symlinkPath);
                         }
-                    }
-
-                    // TODO: Revisit with cleaner solution
-                    if (lpOutBuffer->ReparseTag == IO_REPARSE_TAG_MOUNT_POINT)
-                    {
-                        size_t slen = lpOutBuffer->MountPointReparseBuffer.SubstituteNameLength / sizeof(WCHAR);
-                        WCHAR *szSubName = new WCHAR[slen + 1];
-                        wcsncpy_s(szSubName, slen + 1, &lpOutBuffer->MountPointReparseBuffer.PathBuffer[lpOutBuffer->MountPointReparseBuffer.SubstituteNameOffset / sizeof(WCHAR)], slen);
-                        szSubName[slen] = 0;
-                        std::wstring wStringTemp(szSubName);
-                        delete[] szSubName;
+                        break;
+                    case IO_REPARSE_TAG_LX_SYMLINK:
+                        nlen = MAXIMUM_REPARSE_DATA_BUFFER_SIZE - sizeof(REPARSE_DATA_BUFFER);
+                        szName = new WCHAR[nlen / sizeof(WCHAR)];
+                        MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, (LPCCH) &lpOutBuffer->GenericReparseBuffer.DataBuffer + 4, (int) nlen, szName, nlen / sizeof(WCHAR));
+                        wStringTemp.append(szName);
+                        delete[] szName;
+                        cPrintName.append(wStringTemp.begin(), wStringTemp.end());
+                        finalSymlinkPath.assign(cPrintName);
+                        break;
+                    case IO_REPARSE_TAG_MOUNT_POINT:
+                        nlen = lpOutBuffer->MountPointReparseBuffer.SubstituteNameLength / sizeof(WCHAR);
+                        szName = new WCHAR[nlen + 1];
+                        wcsncpy_s(szName, nlen + 1, &lpOutBuffer->MountPointReparseBuffer.PathBuffer[lpOutBuffer->MountPointReparseBuffer.SubstituteNameOffset / sizeof(WCHAR)], nlen);
+                        szName[nlen] = 0;
+                        wStringTemp.append(szName);
+                        delete[] szName;
                         std::string target(wStringTemp.begin(), wStringTemp.end());
                         target.erase(0, 2);
                         target.insert(0, 2, '\\');
@@ -642,14 +650,13 @@ nfsstat3 CNFS3Prog::ProcedureREADLINK(void)
                         PathRelativePathTo(szOut, cStr, FILE_ATTRIBUTE_DIRECTORY, target.c_str(), FILE_ATTRIBUTE_DIRECTORY);
                         std::string symlinkPath = szOut;
                         finalSymlinkPath.assign(symlinkPath);
-                    }
-
-                    // write path always with / separator, so windows created symlinks work too
-                    std::replace(finalSymlinkPath.begin(), finalSymlinkPath.end(), '\\', '/');
-                    char *result = _strdup(finalSymlinkPath.c_str());
-                    data.Set(result);
+                        break;
                 }
-                free(lpOutBuffer);
+
+                // write path always with / separator, so windows created symlinks work too
+                std::replace(finalSymlinkPath.begin(), finalSymlinkPath.end(), '\\', '/');
+                char *result = _strdup(finalSymlinkPath.c_str());
+                data.Set(result);                
             }
         }
         CloseHandle(hFile);
@@ -663,6 +670,7 @@ nfsstat3 CNFS3Prog::ProcedureREADLINK(void)
         Write(&data);
     }
 
+    free(lpOutBuffer);
     return stat;
 }
 

@@ -6,6 +6,8 @@
 #include <windows.h>
 #include <unordered_map>
 
+#define IO_REPARSE_TAG_LX_SYMLINK 0xA000001D
+
 typedef unsigned __int64 uint64;
 typedef unsigned long uint32;
 typedef long int32;
