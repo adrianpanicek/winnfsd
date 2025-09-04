@@ -147,6 +147,11 @@ void opaque::SetSize(uint32 len)
     memset(contents, 0, length);
 }
 
+void opaque::SetSizeNoRealloc(uint32 len)
+{
+    length = len;
+}
+
 nfs_fh3::nfs_fh3() : opaque(NFS3_FHSIZE)
 {
 }
@@ -679,6 +684,7 @@ nfsstat3 CNFS3Prog::ProcedureREAD(void)
     std::string path;
     offset3 offset;
     count3 count;
+    count3 read = 0;
     post_op_attr file_attributes;
     bool eof;
     opaque data;
@@ -698,7 +704,8 @@ nfsstat3 CNFS3Prog::ProcedureREAD(void)
 
         if (pFile != NULL) {
             _fseeki64(pFile, offset, SEEK_SET) ;
-            count = fread(data.contents, sizeof(char), count, pFile);
+            read = (count3) fread(data.contents, sizeof(char), count, pFile);
+            data.SetSizeNoRealloc(read);
             eof = fgetc(pFile) == EOF;
             fclose(pFile);
         } else {
@@ -721,7 +728,7 @@ nfsstat3 CNFS3Prog::ProcedureREAD(void)
     Write(&file_attributes);
 
     if (stat == NFS3_OK) {
-        Write(&count);
+        Write(&read);
         Write(&eof);
         Write(&data);
     }
