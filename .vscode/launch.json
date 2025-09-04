@@ -6,9 +6,9 @@
       "type": "cppvsdbg",
       "request": "launch",
       "program": "${workspaceFolder}\\build\\x64\\Debug\\WinNFSd.exe",
-      "args": ["-log", "on", "-portMapPort", "1111", "-nfsPort", "2050", "-mountPort", "1059", "C:\\\\Temp", "/"],
+      "args": ["-log", "on", "${input:hostPath}", "${input:nfsAlias}"],
       "cwd": "${workspaceFolder}",
-      "externalConsole": true,
+      "console": "integratedTerminal",
       "preLaunchTask": "Build WinNFSd (Debug)"
     },
     {
@@ -16,9 +16,9 @@
       "type": "cppvsdbg",
       "request": "launch",
       "program": "${workspaceFolder}\\build\\x64\\Release\\WinNFSd.exe",
-      "args": ["-log", "on", "-portMapPort", "1111", "-nfsPort", "2050", "-mountPort", "1059", "${input:hostPath}", "${input:nfsAlias}"],
+      "args": ["-log", "on", "${input:hostPath}", "${input:nfsAlias}"],
       "cwd": "${workspaceFolder}",
-      "externalConsole": true,
+      "console": "integratedTerminal",
       "preLaunchTask": "Build WinNFSd (Release)"
     },
     {

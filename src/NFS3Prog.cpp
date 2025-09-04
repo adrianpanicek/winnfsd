@@ -1299,7 +1299,8 @@ nfsstat3 CNFS3Prog::ProcedureREADDIRPLUS(void)
     bool eof;
     nfsstat3 stat;
     char filePath[MAXPATHLEN];
-    int handle, nFound;
+    intptr_t handle;
+    int nFound;
     struct _finddata_t fileinfo;
     unsigned int i, j;
     bool bFollows;
@@ -1359,6 +1360,7 @@ nfsstat3 CNFS3Prog::ProcedureREADDIRPLUS(void)
                         eof = false;
                         break;
                     }
+
                 } while (_findnext(handle, &fileinfo) == 0);
             }
 
