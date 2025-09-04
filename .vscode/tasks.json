@@ -1,0 +1,53 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Build WinNFSd (Debug)",
+      "type": "shell",
+      "command": "${input:msbuildExe}",
+      "args": [
+        "${input:slnOrProj}",
+        "/m",
+        "/t:Build",
+        "/p:Configuration=Debug",
+        "/p:Platform=x64",
+        "/p:OutDir=${workspaceFolder}\\build\\x64\\Debug\\",
+        "/p:GenerateFullPaths=true"
+      ],
+      "group": "build",
+      "problemMatcher": "$msCompile",
+      "options": { "cwd": "${workspaceFolder}" }
+    },
+    {
+      "label": "Build WinNFSd (Release)",
+      "type": "shell",
+      "command": "${input:msbuildExe}",
+      "args": [
+        "${input:slnOrProj}",
+        "/m",
+        "/t:Build",
+        "/p:Configuration=Release",
+        "/p:Platform=x64",
+        "/p:OutDir=${workspaceFolder}\\build\\x64\\Release\\",
+        "/p:GenerateFullPaths=true"
+      ],
+      "group": "build",
+      "problemMatcher": "$msCompile",
+      "options": { "cwd": "${workspaceFolder}" }
+    }
+  ],
+  "inputs": [
+    {
+      "id": "msbuildExe",
+      "type": "promptString",
+      "description": "Path to MSBuild.exe (or just 'msbuild' if on PATH)",
+      "default": "msbuild"
+    },
+    {
+      "id": "slnOrProj",
+      "type": "promptString",
+      "description": "Path to your .sln or .vcxproj",
+      "default": "${workspaceFolder}\\WinNFSd.sln"
+    }
+  ]
+}

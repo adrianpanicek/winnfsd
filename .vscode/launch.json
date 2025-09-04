@@ -1,0 +1,45 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "WinNFSd (Debug) — build & launch",
+      "type": "cppvsdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}\\build\\x64\\Debug\\WinNFSd.exe",
+      "args": ["-log", "on", "-portMapPort", "1111", "-nfsPort", "2050", "-mountPort", "1059", "C:\\\\Temp", "/"],
+      "cwd": "${workspaceFolder}",
+      "externalConsole": true,
+      "preLaunchTask": "Build WinNFSd (Debug)"
+    },
+    {
+      "name": "WinNFSd (Release) — build & launch",
+      "type": "cppvsdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}\\build\\x64\\Release\\WinNFSd.exe",
+      "args": ["-log", "on", "-portMapPort", "1111", "-nfsPort", "2050", "-mountPort", "1059", "${input:hostPath}", "${input:nfsAlias}"],
+      "cwd": "${workspaceFolder}",
+      "externalConsole": true,
+      "preLaunchTask": "Build WinNFSd (Release)"
+    },
+    {
+      "name": "Attach to WinNFSd",
+      "type": "cppvsdbg",
+      "request": "attach",
+      "processName": "WinNFSd.exe"
+    }
+  ],
+  "inputs": [
+    {
+      "id": "hostPath",
+      "type": "promptString",
+      "description": "Windows path to export",
+      "default": "C:\\\\Temp"
+    },
+    {
+      "id": "nfsAlias",
+      "type": "promptString",
+      "description": "NFS export alias",
+      "default": "/"
+    }
+  ]
+}

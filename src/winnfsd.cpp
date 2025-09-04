@@ -32,11 +32,13 @@ static CRPCServer g_RPCServer;
 static CPortmapProg g_PortmapProg;
 static CNFSProg g_NFSProg;
 static CMountProg g_MountProg;
+static unsigned short g_nNFSPort, g_nMountPort, g_nPortmapPort;
 
 static void printUsage(char *pExe)
 {
     printf("\n");
-    printf("Usage: %s [-id <uid> <gid>] [-log on | off] [-pathFile <file>] [-addr <ip>] [export path] [alias path]\n\n", pExe);
+    printf("Usage: %s [-id <uid> <gid>] [-log on | off] [-pathFile <file>]\n", pExe);
+    printf("[-mountPort <port>] [-nfsPort <port>] [-portmapPort <port>] [-addr <ip>] [export path] [alias path]\n\n");
     printf("At least a file or a path is needed\n");
     printf("For example:\n");
     printf("On Windows> %s d:\\work\n", pExe);
@@ -184,9 +186,13 @@ static void start(std::vector<std::vector<std::string>> paths)
 	CServerSocket ServerSockets[SOCKET_NUM];
 	bool bSuccess;
 	hostent *localHost;
+    
+    int nPortMapPort = g_nPortmapPort > 0 ? g_nPortmapPort : PORTMAP_PORT;
+    int nNFSPort = g_nNFSPort > 0 ? g_nNFSPort : NFS_PORT;
+    int nMountPort = g_nMountPort > 0 ? g_nMountPort : MOUNT_PORT;
 
-	g_PortmapProg.Set(PROG_MOUNT, MOUNT_PORT);  //map port for mount
-	g_PortmapProg.Set(PROG_NFS, NFS_PORT);  //map port for nfs
+	g_PortmapProg.Set(PROG_MOUNT, nMountPort);  //map port for mount
+	g_PortmapProg.Set(PROG_NFS, nNFSPort);  //map port for nfs
 	g_NFSProg.SetUserID(g_nUID, g_nGID);  //set uid and gid of files
 
 	mountPaths(paths);
@@ -203,13 +209,13 @@ static void start(std::vector<std::vector<std::string>> paths)
 
 	bSuccess = false;
 
-	if (ServerSockets[0].Open(PORTMAP_PORT, 3) && DatagramSockets[0].Open(PORTMAP_PORT)) { //start portmap daemon
+	if (ServerSockets[0].Open(nPortMapPort, 3) && DatagramSockets[0].Open(nPortMapPort)) { //start portmap daemon
 		printf("Portmap daemon started\n");
 
-		if (ServerSockets[1].Open(NFS_PORT, 10) && DatagramSockets[1].Open(NFS_PORT)) { //start nfs daemon
+		if (ServerSockets[1].Open(nNFSPort, 10) && DatagramSockets[1].Open(nNFSPort)) { //start nfs daemon
 			printf("NFS daemon started\n");
 
-			if (ServerSockets[2].Open(MOUNT_PORT, 3) && DatagramSockets[2].Open(MOUNT_PORT)) { //start mount daemon
+			if (ServerSockets[2].Open(nMountPort, 3) && DatagramSockets[2].Open(nMountPort)) { //start mount daemon
 				printf("Mount daemon started\n");
 				bSuccess = true;  //all daemon started
 			} else {
@@ -221,7 +227,6 @@ static void start(std::vector<std::vector<std::string>> paths)
 	} else {
 		printf("Portmap daemon starts failed.\n");
 	}
-
 
 	if (bSuccess) {
 		localHost = gethostbyname("");
@@ -263,6 +268,12 @@ int main(int argc, char *argv[])
             g_nGID = atoi(argv[++i]);
         } else if (_stricmp(argv[i], "-log") == 0) {
             g_bLogOn = _stricmp(argv[++i], "off") != 0;
+        } else if (_stricmp(argv[i], "-nfsPort") == 0) {
+            g_nNFSPort = atoi(argv[++i]);
+        } else if (_stricmp(argv[i], "-portmapPort") == 0) {
+            g_nPortmapPort = atoi(argv[++i]);
+        } else if (_stricmp(argv[i], "-mountPort") == 0) {
+            g_nMountPort = atoi(argv[++i]);
         } else if (_stricmp(argv[i], "-addr") == 0) {
 			g_sInAddr = argv[++i];
 		} else if (_stricmp(argv[i], "-pathFile") == 0) {
