@@ -38,6 +38,7 @@ class opaque
     opaque(uint32 len);
     virtual ~opaque();
     virtual void SetSize(uint32 len);
+    virtual void SetSizeNoRealloc(uint32 len);
 };
 
 class nfs_fh3 : public opaque
