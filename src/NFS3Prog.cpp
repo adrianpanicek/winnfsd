@@ -526,63 +526,6 @@ nfsstat3 CNFS3Prog::ProcedureACCESS(void)
     return stat;
 }
 
-nfsstat3 CNFS3Prog::ProcedureREAD(void)
-{
-    std::string path;
-    offset3 offset;
-    count3 count;
-    count3 read = 0;
-    post_op_attr file_attributes;
-    bool eof;
-    opaque data;
-    nfsstat3 stat;
-    FILE *pFile;
-
-    PrintLog("READ");
-    bool validHandle = GetPath(path);
-    const char* cStr = validHandle ? path.c_str() : NULL;
-    Read(&offset);
-    Read(&count);
-    stat = CheckFile(cStr);
-
-    if (stat == NFS3_OK) {
-        data.SetSize(count);
-        pFile = _fsopen(cStr, "rb", _SH_DENYWR);
-
-        if (pFile != NULL) {
-            _fseeki64(pFile, offset, SEEK_SET) ;
-            read = (count3) fread(data.contents, sizeof(char), count, pFile);
-            data.SetSizeNoRealloc(read);
-            eof = fgetc(pFile) == EOF;
-            fclose(pFile);
-        } else {
-            char buffer[BUFFER_SIZE];
-            errno_t errorNumber = errno;
-            strerror_s(buffer, BUFFER_SIZE, errorNumber);
-            PrintLog(buffer);
-
-            if (errorNumber == 13) {
-                stat = NFS3ERR_ACCES;
-            } else {
-                stat = NFS3ERR_IO;
-            }
-        }
-    }
-
-    file_attributes.attributes_follow = GetFileAttributesForNFS(cStr, &file_attributes.attributes);
-
-    Write(&stat);
-    Write(&file_attributes);
-
-    if (stat == NFS3_OK) {
-        Write(&read);
-        Write(&eof);
-        Write(&data);
-    }
-
-    return stat;
-}
-
 nfsstat3 CNFS3Prog::ProcedureWRITE(void)
 {
     std::string path;

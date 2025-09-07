@@ -145,6 +145,7 @@
     <ClCompile Include="SocketStream.cpp" />
     <ClCompile Include="winnfsd.cpp" />
     <ClCompile Include="NFS3Prog/READLINK.cpp" />
+    <ClCompile Include="NFS3Prog/READ.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DatagramSocket.h" />
