@@ -61,6 +61,8 @@
         "xmemory": "cpp",
         "xtr1common": "cpp",
         "xtree": "cpp",
-        "xutility": "cpp"
-    }
+        "xutility": "cpp",
+        "*.rh": "cpp"
+    },
+    "C_Cpp.default.cppStandard": "c++17"
 }

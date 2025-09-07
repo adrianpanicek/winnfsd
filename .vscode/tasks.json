@@ -9,6 +9,7 @@
         "${input:slnOrProj}",
         "/m",
         "/t:Build",
+        "/p:LanguageStandard=stdcpp20",
         "/p:Configuration=Debug",
         "/p:Platform=x64",
         "/p:OutDir=${workspaceFolder}\\build\\x64\\Debug\\",
@@ -41,13 +42,13 @@
       "id": "msbuildExe",
       "type": "promptString",
       "description": "Path to MSBuild.exe (or just 'msbuild' if on PATH)",
-      "default": "msbuild"
+      "default": "C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\MSBuild\\Current\\Bin\\MSBuild.exe"
     },
     {
       "id": "slnOrProj",
       "type": "promptString",
       "description": "Path to your .sln or .vcxproj",
-      "default": "${workspaceFolder}\\WinNFSd.sln"
+      "default": "${workspaceFolder}\\src\\WinNFSd.sln"
     }
   ]
 }
