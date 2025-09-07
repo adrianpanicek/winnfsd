@@ -41,39 +41,6 @@ enum
 
 enum
 {
-    NFS3_OK = 0,
-    NFS3ERR_PERM = 1,
-    NFS3ERR_NOENT = 2,
-    NFS3ERR_IO = 5,
-    NFS3ERR_NXIO = 6,
-    NFS3ERR_ACCES = 13,
-    NFS3ERR_EXIST = 17,
-    NFS3ERR_XDEV = 18,
-    NFS3ERR_NODEV = 19,
-    NFS3ERR_NOTDIR = 20,
-    NFS3ERR_ISDIR = 21,
-    NFS3ERR_INVAL = 22,
-    NFS3ERR_FBIG = 27,
-    NFS3ERR_NOSPC = 28,
-    NFS3ERR_ROFS = 30,
-    NFS3ERR_MLINK = 31,
-    NFS3ERR_NAMETOOLONG = 63,
-    NFS3ERR_NOTEMPTY = 66,
-    NFS3ERR_DQUOT = 69,
-    NFS3ERR_STALE = 70,
-    NFS3ERR_REMOTE = 71,
-    NFS3ERR_BADHANDLE = 10001,
-    NFS3ERR_NOT_SYNC = 10002,
-    NFS3ERR_BAD_COOKIE = 10003,
-    NFS3ERR_NOTSUPP = 10004,
-    NFS3ERR_TOOSMALL = 10005,
-    NFS3ERR_SERVERFAULT = 10006,
-    NFS3ERR_BADTYPE = 10007,
-    NFS3ERR_JUKEBOX = 10008
-};
-
-enum
-{
     NF3REG = 1,
     NF3DIR = 2,
     NF3BLK = 3,
@@ -191,17 +158,17 @@ nfspath3::~nfspath3()
 {
 }
 
-void nfspath3::SetSize(uint32 len)
+void nfspath3::SetSize(size_t len)
 {
     opaque::SetSize(len + 1);
     length = len;
     path = (char *)contents;
 }
 
-void nfspath3::Set(char *str)
+void nfspath3::Set(const char *str)
 {
     SetSize(strlen(str));
-    strcpy_s(path, (strlen(str) + 1), str);
+    strcpy_s(path, (strlen(str) + 1), str); // size_t + 1, possible overflow
 }
 
 typedef nfsstat3(CNFS3Prog::*PPROC)(void);
@@ -556,126 +523,6 @@ nfsstat3 CNFS3Prog::ProcedureACCESS(void)
         Write(&access);
     }
 
-    return stat;
-}
-
-nfsstat3 CNFS3Prog::ProcedureREADLINK(void)
-{
-    PrintLog("READLINK");
-    std::string path;
-    char *pMBBuffer = 0;
-
-    post_op_attr symlink_attributes;
-    nfspath3 data = nfspath3();
-
-    //opaque data;
-    nfsstat3 stat;
-
-    HANDLE hFile;
-    REPARSE_DATA_BUFFER *lpOutBuffer;
-    lpOutBuffer = (REPARSE_DATA_BUFFER*) calloc(1, MAXIMUM_REPARSE_DATA_BUFFER_SIZE);
-    DWORD bytesReturned;
-
-    bool validHandle = GetPath(path);
-    const char* cStr = validHandle ? path.c_str() : NULL;
-    stat = CheckFile(cStr);
-    if (stat == NFS3_OK) {
-
-        hFile = CreateFile(cStr, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_REPARSE_POINT | FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_BACKUP_SEMANTICS, NULL);
-
-        if (hFile == INVALID_HANDLE_VALUE) {
-            stat = NFS3ERR_IO;
-        }
-        else
-        {
-            if (!lpOutBuffer) {
-                stat = NFS3ERR_IO;
-            }
-            else {
-                DeviceIoControl(hFile, FSCTL_GET_REPARSE_POINT, NULL, 0, lpOutBuffer, MAXIMUM_REPARSE_DATA_BUFFER_SIZE, &bytesReturned, NULL);
-                std::string finalSymlinkPath;
-                std::wstring wStringTemp;
-                std::string cPrintName;
-                size_t nlen = 0;
-                WCHAR* szName;
-
-                switch (lpOutBuffer->ReparseTag) {
-                    case IO_REPARSE_TAG_SYMLINK:
-                        nlen = lpOutBuffer->SymbolicLinkReparseBuffer.PrintNameLength / sizeof(WCHAR);
-                        szName = new WCHAR[nlen + 1];
-                        wcsncpy_s(szName, nlen + 1, &lpOutBuffer->SymbolicLinkReparseBuffer.PathBuffer[lpOutBuffer->SymbolicLinkReparseBuffer.PrintNameOffset / sizeof(WCHAR)], nlen);
-                        szName[nlen] = 0;
-                        wStringTemp.append(szName);
-                        delete[] szName;
-                        cPrintName.append(wStringTemp.begin(), wStringTemp.end());
-                        finalSymlinkPath.assign(cPrintName);
-                        // TODO: Revisit with cleaner solution
-                        if (!PathIsRelative(cPrintName.c_str()))
-                        {
-                            std::string strFromChar;
-                            strFromChar.append("\\\\?\\");
-                            strFromChar.append(cPrintName);
-                            char *target = _strdup(strFromChar.c_str());
-                            // remove last folder
-                            size_t lastFolderIndex = path.find_last_of('\\');
-                            if (lastFolderIndex != std::string::npos) {
-                                path = path.substr(0, lastFolderIndex);
-                            }
-                            char szOut[MAX_PATH] = "";
-                            PathRelativePathTo(szOut, cStr, FILE_ATTRIBUTE_DIRECTORY, target, FILE_ATTRIBUTE_DIRECTORY);
-                            std::string symlinkPath(szOut);
-                            finalSymlinkPath.assign(symlinkPath);
-                        }
-                        break;
-                    case IO_REPARSE_TAG_LX_SYMLINK:
-                        nlen = MAXIMUM_REPARSE_DATA_BUFFER_SIZE - sizeof(REPARSE_DATA_BUFFER);
-                        szName = new WCHAR[nlen / sizeof(WCHAR)];
-                        MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, (LPCCH) &lpOutBuffer->GenericReparseBuffer.DataBuffer + 4, (int) nlen, szName, nlen / sizeof(WCHAR));
-                        wStringTemp.append(szName);
-                        delete[] szName;
-                        cPrintName.append(wStringTemp.begin(), wStringTemp.end());
-                        finalSymlinkPath.assign(cPrintName);
-                        break;
-                    case IO_REPARSE_TAG_MOUNT_POINT:
-                        nlen = lpOutBuffer->MountPointReparseBuffer.SubstituteNameLength / sizeof(WCHAR);
-                        szName = new WCHAR[nlen + 1];
-                        wcsncpy_s(szName, nlen + 1, &lpOutBuffer->MountPointReparseBuffer.PathBuffer[lpOutBuffer->MountPointReparseBuffer.SubstituteNameOffset / sizeof(WCHAR)], nlen);
-                        szName[nlen] = 0;
-                        wStringTemp.append(szName);
-                        delete[] szName;
-                        std::string target(wStringTemp.begin(), wStringTemp.end());
-                        target.erase(0, 2);
-                        target.insert(0, 2, '\\');
-                        // remove last folder, see above
-                        size_t lastFolderIndex = path.find_last_of('\\');
-                        if (lastFolderIndex != std::string::npos) {
-                            path = path.substr(0, lastFolderIndex);
-                        }
-                        char szOut[MAX_PATH] = "";
-                        PathRelativePathTo(szOut, cStr, FILE_ATTRIBUTE_DIRECTORY, target.c_str(), FILE_ATTRIBUTE_DIRECTORY);
-                        std::string symlinkPath = szOut;
-                        finalSymlinkPath.assign(symlinkPath);
-                        break;
-                }
-
-                // write path always with / separator, so windows created symlinks work too
-                std::replace(finalSymlinkPath.begin(), finalSymlinkPath.end(), '\\', '/');
-                char *result = _strdup(finalSymlinkPath.c_str());
-                data.Set(result);                
-            }
-        }
-        CloseHandle(hFile);
-    }
-
-    symlink_attributes.attributes_follow = GetFileAttributesForNFS(cStr, &symlink_attributes.attributes);
-
-    Write(&stat);
-    Write(&symlink_attributes);
-    if (stat == NFS3_OK) {
-        Write(&data);
-    }
-
-    free(lpOutBuffer);
     return stat;
 }
 
