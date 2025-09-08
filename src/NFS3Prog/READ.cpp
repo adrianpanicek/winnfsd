@@ -19,7 +19,7 @@ bool load_data(opaque &data, bool &eof, count3 &dataLength, offset3 offset, coun
 
     fclose(pFile);
 
-    return eof;
+    return true;
 }
 
 nfsstat3 CNFS3Prog::ProcedureREAD(void)

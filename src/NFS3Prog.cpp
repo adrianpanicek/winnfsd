@@ -765,7 +765,9 @@ nfsstat3 CNFS3Prog::ProcedureSYMLINK(void)
     // in a safer way by a combination of PathRelativePathTo and GetFullPathName.
     // Without this conversion nested folder symlinks do not work cross platform.
     std::string strFromChar;
-    strFromChar.append(symlink.symlink_data.path); // target (should be relative path));
+    symlink.symlink_data.path 
+        ? strFromChar.append(symlink.symlink_data.path) 
+        : strFromChar.append((const char*) symlink.symlink_data.contents, (size_t) symlink.symlink_data.length); // target (should be relative path));
     std::replace(strFromChar.begin(), strFromChar.end(), '/', '\\');
     _In_ LPTSTR lpTargetFileName = const_cast<LPSTR>(strFromChar.c_str());
 
