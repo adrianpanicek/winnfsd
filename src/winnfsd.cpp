@@ -141,7 +141,9 @@ static void inputCommand(void)
 	printf("Type 'help' to see help\n\n");
 
 	while (true) {
-		fgets(command, 20, stdin);
+		if(!fgets(command, 20, stdin)) {
+            break;
+        }
 
 		if (command[strlen(command) - 1] == '\n') {
 			command[strlen(command) - 1] = '\0';
