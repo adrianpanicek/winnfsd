@@ -33,6 +33,7 @@ static CPortmapProg g_PortmapProg;
 static CNFSProg g_NFSProg;
 static CMountProg g_MountProg;
 static unsigned short g_nNFSPort, g_nMountPort, g_nPortmapPort;
+static HANDLE g_hTerminateEvent = NULL;
 
 static void printUsage(char *pExe)
 {
@@ -71,61 +72,10 @@ static void printAbout(void)
     printLine();
 }
 
-static void printHelp(void)
-{
-    printLine();
-    printf("Commands:\n");
-    printf("about: display messages about this program\n");
-    printf("help: display help\n");
-    printf("log on/off: display log messages or not\n");
-    printf("list: list mounted clients\n");
-    printf("refresh: refresh the mounted folders\n");
-    printf("reset: reset the service\n");
-    printf("quit: quit this program\n");
-    printLine();
-}
-
-static void printCount(void)
-{
-    int nNum;
-
-    nNum = g_MountProg.GetMountNumber();
-
-    if (nNum == 0) {
-        printf("There is no client mounted.\n");
-    } else if (nNum == 1) {
-        printf("There is 1 client mounted.\n");
-    } else {
-        printf("There are %d clients mounted.\n", nNum);
-    }
-}
-
-static void printList(void)
-{
-    int i, nNum;
-
-    printLine();
-    nNum = g_MountProg.GetMountNumber();
-
-    for (i = 0; i < nNum; i++) {
-        printf("%s\n", g_MountProg.GetClientAddr(i));
-    }
-
-    printCount();
-    printLine();
-}
-
-static void printConfirmQuit(void)
-{
-    printf("\n");
-    printCount();
-    printf("Are you sure to quit? (y/N): ");
-}
-
 static void mountPaths(std::vector<std::vector<std::string>> paths)
 {
-	int i;
-	int numberOfElements = paths.size();
+	size_t i;
+	size_t numberOfElements = paths.size();
 
 	for (i = 0; i < numberOfElements; i++) {
 		char *pPath = (char*)paths[i][0].c_str();
@@ -134,51 +84,32 @@ static void mountPaths(std::vector<std::vector<std::string>> paths)
 	}
 }
 
-static void inputCommand(void)
+BOOL WINAPI ConsoleTerminateHandler(DWORD ctrlType)
 {
-	char command[20];
+    switch (ctrlType) {
+        case CTRL_C_EVENT:
+        case CTRL_BREAK_EVENT:
+        case CTRL_CLOSE_EVENT:
+        case CTRL_LOGOFF_EVENT:
+        case CTRL_SHUTDOWN_EVENT:
+            if (g_hTerminateEvent) SetEvent(g_hTerminateEvent);
+            return TRUE;
+        default:
+            return FALSE;
+    }
+}
 
-	printf("Type 'help' to see help\n\n");
+static void waitForTerminateEvent()
+{
+    g_hTerminateEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+    SetConsoleCtrlHandler(ConsoleTerminateHandler, TRUE);
 
-	while (true) {
-		if(!fgets(command, 20, stdin)) {
-            break;
-        }
+    printf("Press Ctrl+C or close the console window to terminate...\n");
+    WaitForSingleObject(g_hTerminateEvent, INFINITE);
 
-		if (command[strlen(command) - 1] == '\n') {
-			command[strlen(command) - 1] = '\0';
-		}
-
-		if (_stricmp(command, "about") == 0) {
-			printAbout();
-		} else if (_stricmp(command, "help") == 0) {
-			printHelp();
-		} else if (_stricmp(command, "log on") == 0) {
-			g_RPCServer.SetLogOn(true);
-		} else if (_stricmp(command, "log off") == 0) {
-			g_RPCServer.SetLogOn(false);
-		} else if (_stricmp(command, "list") == 0) {
-			printList();
-		} else if (_stricmp(command, "quit") == 0) {
-			if (g_MountProg.GetMountNumber() == 0) {
-				break;
-			} else {
-				printConfirmQuit();
-				fgets(command, 20, stdin);
-
-				if (command[0] == 'y' || command[0] == 'Y') {
-					break;
-				}
-			}
-		} else if (_stricmp(command, "refresh") == 0) {
-			g_MountProg.Refresh();
-		} else if (_stricmp(command, "reset") == 0) {
-			g_RPCServer.Set(PROG_NFS, NULL);
-		} else if (strcmp(command, "") != 0) {
-			printf("Unknown command: '%s'\n", command);
-			printf("Type 'help' to see help\n");
-		}
-	}
+    SetConsoleCtrlHandler(ConsoleTerminateHandler, FALSE);
+    CloseHandle(g_hTerminateEvent);
+    g_hTerminateEvent = NULL;
 }
 
 static void start(std::vector<std::vector<std::string>> paths)
@@ -233,7 +164,7 @@ static void start(std::vector<std::vector<std::string>> paths)
 	if (bSuccess) {
 		localHost = gethostbyname("");
 		printf("Listening on %s\n", g_sInAddr);  //local address
-		inputCommand();  //wait for commands
+		waitForTerminateEvent();
 	}
 
 	for (i = 0; i < SOCKET_NUM; i++) {
