@@ -1061,20 +1061,42 @@ nfsstat3 CNFS3Prog::ProcedureREADDIR(void)
                 nFound = _findnext(handle, &fileinfo);
             }
 
-            // TODO: Implement this workaround correctly with the
-            // count variable and not a fixed threshold of 10
             if (nFound == 0) {
                 j = 10;
 
                 do {
-                    Write(&bFollows); //value follows
+                    Write(&bFollows);
                     sprintf_s(filePath, "%s\\%s", cStr, fileinfo.name);
-                    fileid = GetFileID(filePath);
-                    Write(&fileid); //file id
+
+                    // Get stable fileid from Windows file index
+                    fileid = 0;
+                    HANDLE hFile = CreateFileA(
+                        filePath,
+                        FILE_READ_EA,
+                        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                        NULL,
+                        OPEN_EXISTING,
+                        FILE_FLAG_BACKUP_SEMANTICS,  // needed for directories
+                        NULL
+                    );
+                    
+                    if (hFile != INVALID_HANDLE_VALUE) {
+                        BY_HANDLE_FILE_INFORMATION fi;
+                        if (GetFileInformationByHandle(hFile, &fi)) {
+                            fileid = ((fileid3)fi.nFileIndexHigh << 32) | fi.nFileIndexLow;
+                        }
+                        CloseHandle(hFile);
+                    }
+                    
+                    if (fileid == 0) {
+                        fileid = GetFileID(filePath); // fallback
+                    }
+
+                    Write(&fileid);
                     name.Set(fileinfo.name);
-                    Write(&name); //name
+                    Write(&name);
                     ++cookie;
-                    Write(&cookie); //cookie
+                    Write(&cookie);
                     if (--j == 0) {
                         eof = false;
                         break;
@@ -1087,7 +1109,7 @@ nfsstat3 CNFS3Prog::ProcedureREADDIR(void)
 
         bFollows = false;
         Write(&bFollows);
-        Write(&eof); //eof
+        Write(&eof);
     }
 
     return stat;
@@ -1153,13 +1175,15 @@ nfsstat3 CNFS3Prog::ProcedureREADDIRPLUS(void)
                 do {
                     Write(&bFollows); //value follows
                     sprintf_s(filePath, "%s\\%s", cStr, fileinfo.name);
+                    name_attributes.attributes_follow = GetFileAttributesForNFS(filePath, &name_attributes.attributes);
+                    fileid = name_attributes.attributes.fileid; // already computed inside, reuse it
+                    Write(&fileid);
                     fileid = GetFileID(filePath);
                     Write(&fileid); //file id
                     name.Set(fileinfo.name);
                     Write(&name); //name
                     ++cookie;
                     Write(&cookie); //cookie
-                    name_attributes.attributes_follow = GetFileAttributesForNFS(filePath, &name_attributes.attributes);
                     Write(&name_attributes);
                     name_handle.handle_follows = GetFileHandle(filePath, &name_handle.handle);
                     Write(&name_handle);
@@ -1787,7 +1811,7 @@ bool CNFS3Prog::GetFileAttributesForNFS(const char *path, fattr3 *pAttr)
     pAttr->rdev.specdata1 = 0;
     pAttr->rdev.specdata2 = 0;
     pAttr->fsid = 7; //NTFS //4; 
-    pAttr->fileid = GetFileID(path);
+    pAttr->fileid = ((uint64) lpFileInformation.nFileIndexHigh << 32) | lpFileInformation.nFileIndexLow;
     pAttr->atime.seconds = FileTimeToPOSIX(lpFileInformation.ftLastAccessTime);
     pAttr->atime.nseconds = 0;
     pAttr->mtime.seconds = FileTimeToPOSIX(lpFileInformation.ftLastWriteTime);
