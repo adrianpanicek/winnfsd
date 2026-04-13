@@ -144,8 +144,29 @@
     <ClCompile Include="Socket.cpp" />
     <ClCompile Include="SocketStream.cpp" />
     <ClCompile Include="winnfsd.cpp" />
+    <ClCompile Include="NFS3Prog/ACCESS.cpp" />
+    <ClCompile Include="NFS3Prog/COMMIT.cpp" />
+    <ClCompile Include="NFS3Prog/CREATE.cpp" />
+    <ClCompile Include="NFS3Prog/FSINFO.cpp" />
+    <ClCompile Include="NFS3Prog/FSSTAT.cpp" />
+    <ClCompile Include="NFS3Prog/GETATTR.cpp" />
+    <ClCompile Include="NFS3Prog/LINK.cpp" />
+    <ClCompile Include="NFS3Prog/LOOKUP.cpp" />
+    <ClCompile Include="NFS3Prog/MKDIR.cpp" />
+    <ClCompile Include="NFS3Prog/MKNOD.cpp" />
+    <ClCompile Include="NFS3Prog/NOIMP.cpp" />
+    <ClCompile Include="NFS3Prog/NULL.cpp" />
+    <ClCompile Include="NFS3Prog/PATHCONF.cpp" />
+    <ClCompile Include="NFS3Prog/READDIR.cpp" />
+    <ClCompile Include="NFS3Prog/READDIRPLUS.cpp" />
     <ClCompile Include="NFS3Prog/READLINK.cpp" />
     <ClCompile Include="NFS3Prog/READ.cpp" />
+    <ClCompile Include="NFS3Prog/REMOVE.cpp" />
+    <ClCompile Include="NFS3Prog/RENAME.cpp" />
+    <ClCompile Include="NFS3Prog/RMDIR.cpp" />
+    <ClCompile Include="NFS3Prog/SETATTR.cpp" />
+    <ClCompile Include="NFS3Prog/SYMLINK.cpp" />
+    <ClCompile Include="NFS3Prog/WRITE.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DatagramSocket.h" />

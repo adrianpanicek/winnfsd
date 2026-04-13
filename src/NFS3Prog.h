@@ -260,6 +260,46 @@ typedef struct _REPARSE_DATA_BUFFER {
 	};
 } REPARSE_DATA_BUFFER, *PREPARSE_DATA_BUFFER;
 
+enum
+{
+    NF3REG = 1,
+    NF3DIR = 2,
+    NF3BLK = 3,
+    NF3CHR = 4,
+    NF3LNK = 5,
+    NF3SOCK = 6,
+    NF3FIFO = 7
+};
+
+enum
+{
+    FSF3_LINK = 0x0001,
+    FSF3_SYMLINK = 0x0002,
+    FSF3_HOMOGENEOUS = 0x0008,
+    FSF3_CANSETTIME = 0x0010
+};
+
+enum
+{
+    UNSTABLE = 0,
+    DATA_SYNC = 1,
+    FILE_SYNC = 2
+};
+
+enum
+{
+    DONT_CHANGE = 0,
+    SET_TO_SERVER_TIME = 1,
+    SET_TO_CLIENT_TIME = 2
+};
+
+enum
+{
+    UNCHECKED = 0,
+    GUARDED = 1,
+    EXCLUSIVE = 2
+};
+
 class CNFS3Prog : public CRPCProg
 {
     public:

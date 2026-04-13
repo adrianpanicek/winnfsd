@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <windows.h>
 
 #include "../NFSProg.h"
@@ -57,7 +58,7 @@ nfsstat3 CNFS3Prog::ProcedureREAD(void)
         strerror_s(buffer, ERROR_BUFFER_SIZE, errorNumber);
         PrintLog(buffer);
 
-        stat = errorNumber == 13 ? NFS3ERR_ACCES : NFS3ERR_IO;
+        stat = (errorNumber == EACCES) ? NFS3ERR_ACCES : NFS3ERR_IO;
 
         Write(&stat);
         Write(&file_attributes);
