@@ -27,7 +27,9 @@ jobs:
           $hash = $env:GITHUB_SHA.Substring(0, 7)
           (Get-Content src/winnfsd.cpp).replace('{{VERSION}}', $version).replace('{{HASH}}', $hash) | Set-Content src/winnfsd.cpp
 
-          $lastTag = ((git describe --abbrev=0 --tags 2>$null) + ".0").TrimStart('v')
+          $gitTag = git describe --abbrev=0 --tags 2>$null
+          $LASTEXITCODE = 0
+          $lastTag = ("$gitTag.0").TrimStart('v')
           if ([string]::IsNullOrWhiteSpace($lastTag) -or $lastTag -eq '.0') { $lastTag = '0.0.0.0' }
           $lastTagFull = "$lastTag-$hash"
           (Get-Content src/WinNFSd.rc).replace('1,0,0,0', $lastTag.replace('.', ',')) | Set-Content src/WinNFSd.rc
