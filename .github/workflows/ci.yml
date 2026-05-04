@@ -71,10 +71,13 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path C:\share | Out-Null
           Copy-Item -Recurse -Force tests C:\share\
-          # Start WinNFSd in background. -log off keeps stdout quiet.
-          Start-Process -FilePath "${{ github.workspace }}\src\x64\Release\WinNFSd.exe" -ArgumentList "-log off C:\share"
+          $hostIp = (Get-NetIPAddress -AddressFamily IPv4 -PrefixOrigin Dhcp -ErrorAction SilentlyContinue | Select-Object -First 1).IPAddress
+          if (-not $hostIp) { $hostIp = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -notlike '127.*' -and $_.IPAddress -notlike '169.254.*' } | Select-Object -First 1).IPAddress }
+          Write-Host "Windows host IP: $hostIp"
+          "HOST_IP=$hostIp" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+          # Bind WinNFSd explicitly to host IP so WSL2 can reach it.
+          Start-Process -FilePath "${{ github.workspace }}\src\x64\Release\WinNFSd.exe" -ArgumentList "-log off -addr $hostIp C:\share"
           Start-Sleep -Seconds 5
-          # Sanity: confirm process running.
           if (-not (Get-Process WinNFSd -ErrorAction SilentlyContinue)) {
             throw "WinNFSd failed to start"
           }
@@ -101,14 +104,10 @@ jobs:
       - name: Mount + run rename test
         shell: wsl-bash {0}
         run: |
-          set -x
-          HOST_IP=$(awk '/^nameserver/{print $2; exit}' /etc/resolv.conf)
+          set -ex
           echo "HOST_IP=$HOST_IP"
-          ip route
           ping -c 2 -W 2 "$HOST_IP" || true
-          # rpcinfo probes the portmapper at 111/udp; gives clear yes/no on reachability.
           rpcinfo -T udp "$HOST_IP" 100000 2 || true
-          set -e
           sudo mkdir -p /winnfsd
           sudo mount -vvv -o vers=3,udp,nolock,proto=udp,mountproto=udp "${HOST_IP}:/c/share" /winnfsd
           mount | grep /winnfsd
