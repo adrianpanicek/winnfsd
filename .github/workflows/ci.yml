@@ -105,6 +105,7 @@ jobs:
         shell: wsl-bash {0}
         run: |
           set -ex
+          HOST_IP='${{ env.HOST_IP }}'
           echo "HOST_IP=$HOST_IP"
           ping -c 2 -W 2 "$HOST_IP" || true
           rpcinfo -T udp "$HOST_IP" 100000 2 || true
