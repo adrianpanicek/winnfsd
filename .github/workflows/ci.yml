@@ -93,7 +93,7 @@ jobs:
         shell: wsl-bash {0}
         run: |
           set -e
-          HOST_IP=$(ip route show default | awk '{print $3}')
+          HOST_IP=$(awk '/^nameserver/{print $2; exit}' /etc/resolv.conf)
           sudo mkdir -p /winnfsd
           sudo mount -o vers=3,udp,nolock,proto=udp,mountproto=udp "${HOST_IP}:/c/share" /winnfsd
           mount | grep /winnfsd
