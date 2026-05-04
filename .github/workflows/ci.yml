@@ -82,21 +82,20 @@ jobs:
             throw "WinNFSd failed to start"
           }
 
-      - name: Setup WSL (Ubuntu, WSL1)
-        # WSL1 shares the host network stack, so 127.0.0.1 inside WSL
-        # is the same as 127.0.0.1 on Windows where WinNFSd listens.
+      - name: Setup WSL (Ubuntu, WSL2)
         uses: Vampire/setup-wsl@v3
         with:
           distribution: Ubuntu-22.04
-          wsl-version: 1
+          wsl-version: 2
           additional-packages: nfs-common
 
       - name: Mount + run rename test
         shell: wsl-bash {0}
         run: |
           set -e
+          HOST_IP=$(ip route show default | awk '{print $3}')
           sudo mkdir -p /winnfsd
-          sudo mount -o vers=3,udp,nolock,proto=udp,mountproto=udp 127.0.0.1:/c/share /winnfsd
+          sudo mount -o vers=3,udp,nolock,proto=udp,mountproto=udp "${HOST_IP}:/c/share" /winnfsd
           mount | grep /winnfsd
           /winnfsd/tests/bash/rename.sh
 
