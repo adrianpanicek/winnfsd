@@ -1,0 +1,120 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+    tags: ['*']
+  pull_request:
+    branches: [master]
+
+jobs:
+  build:
+    name: Build (Release|x64)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Patch version tokens
+        shell: pwsh
+        run: |
+          $version = if ($env:GITHUB_REF -like 'refs/tags/*') { $env:GITHUB_REF -replace 'refs/tags/','' } else { $env:GITHUB_REF_NAME }
+          $hash = $env:GITHUB_SHA.Substring(0, 7)
+          (Get-Content src/winnfsd.cpp).replace('{{VERSION}}', $version).replace('{{HASH}}', $hash) | Set-Content src/winnfsd.cpp
+
+          $lastTag = ((git describe --abbrev=0 --tags 2>$null) + ".0").TrimStart('v')
+          if ([string]::IsNullOrWhiteSpace($lastTag) -or $lastTag -eq '.0') { $lastTag = '0.0.0.0' }
+          $lastTagFull = "$lastTag-$hash"
+          (Get-Content src/WinNFSd.rc).replace('1,0,0,0', $lastTag.replace('.', ',')) | Set-Content src/WinNFSd.rc
+          (Get-Content src/WinNFSd.rc).replace('1.0.0.0-000000', $lastTagFull) | Set-Content src/WinNFSd.rc
+          (Get-Content src/WinNFSd.rc).replace('1.0.0.0', $lastTag) | Set-Content src/WinNFSd.rc
+          (Get-Content src/WinNFSd.rc).replace('YYYY', (Get-Date -UFormat %Y)) | Set-Content src/WinNFSd.rc
+
+      - name: Build
+        working-directory: src
+        run: msbuild WinNFSd.sln /p:Configuration=Release /p:Platform=x64 /m
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: WinNFSd
+          path: src/x64/Release/WinNFSd.exe
+          if-no-files-found: error
+
+  test:
+    name: Integration tests (WSL NFS client)
+    runs-on: windows-latest
+    needs: build
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download build
+        uses: actions/download-artifact@v4
+        with:
+          name: WinNFSd
+          path: src/x64/Release
+
+      - name: Allow WinNFSd through firewall
+        shell: pwsh
+        run: |
+          $exe = "${{ github.workspace }}\src\x64\Release\WinNFSd.exe"
+          netsh advfirewall firewall add rule name="WinNFSd-IN" dir=in action=allow protocol=any program="$exe" profile=any
+          netsh advfirewall firewall add rule name="WinNFSd-OUT" dir=out action=allow protocol=any program="$exe" profile=any
+
+      - name: Stage share
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path C:\share | Out-Null
+          Copy-Item -Recurse -Force tests C:\share\
+          # Start WinNFSd in background. -log off keeps stdout quiet.
+          Start-Process -FilePath "${{ github.workspace }}\src\x64\Release\WinNFSd.exe" -ArgumentList "-log off C:\share"
+          Start-Sleep -Seconds 5
+          # Sanity: confirm process running.
+          if (-not (Get-Process WinNFSd -ErrorAction SilentlyContinue)) {
+            throw "WinNFSd failed to start"
+          }
+
+      - name: Setup WSL (Ubuntu, WSL1)
+        # WSL1 shares the host network stack, so 127.0.0.1 inside WSL
+        # is the same as 127.0.0.1 on Windows where WinNFSd listens.
+        uses: Vampire/setup-wsl@v3
+        with:
+          distribution: Ubuntu-22.04
+          wsl-version: 1
+          additional-packages: nfs-common
+
+      - name: Mount + run rename test
+        shell: wsl-bash {0}
+        run: |
+          set -e
+          sudo mkdir -p /winnfsd
+          sudo mount -o vers=3,udp,nolock,proto=udp,mountproto=udp 127.0.0.1:/c/share /winnfsd
+          mount | grep /winnfsd
+          /winnfsd/tests/bash/rename.sh
+
+      - name: Stop WinNFSd
+        if: always()
+        shell: pwsh
+        run: Stop-Process -Name WinNFSd -Force -ErrorAction SilentlyContinue
+
+  release:
+    name: Release artifact on tag
+    runs-on: ubuntu-latest
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: Download build
+        uses: actions/download-artifact@v4
+        with:
+          name: WinNFSd
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: WinNFSd.exe
