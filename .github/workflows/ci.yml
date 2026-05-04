@@ -1,0 +1,141 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+    tags: ['*']
+  pull_request:
+    branches: [master]
+
+jobs:
+  build:
+    name: Build (Release|x64)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Patch version tokens
+        shell: pwsh
+        run: |
+          $version = if ($env:GITHUB_REF -like 'refs/tags/*') { $env:GITHUB_REF -replace 'refs/tags/','' } else { $env:GITHUB_REF_NAME }
+          $hash = $env:GITHUB_SHA.Substring(0, 7)
+          (Get-Content src/winnfsd.cpp).replace('{{VERSION}}', $version).replace('{{HASH}}', $hash) | Set-Content src/winnfsd.cpp
+
+          $gitTag = git describe --abbrev=0 --tags 2>$null
+          $LASTEXITCODE = 0
+          $lastTag = ("$gitTag.0").TrimStart('v')
+          if ([string]::IsNullOrWhiteSpace($lastTag) -or $lastTag -eq '.0') { $lastTag = '0.0.0.0' }
+          $lastTagFull = "$lastTag-$hash"
+          (Get-Content src/WinNFSd.rc).replace('1,0,0,0', $lastTag.replace('.', ',')) | Set-Content src/WinNFSd.rc
+          (Get-Content src/WinNFSd.rc).replace('1.0.0.0-000000', $lastTagFull) | Set-Content src/WinNFSd.rc
+          (Get-Content src/WinNFSd.rc).replace('1.0.0.0', $lastTag) | Set-Content src/WinNFSd.rc
+          (Get-Content src/WinNFSd.rc).replace('YYYY', (Get-Date -UFormat %Y)) | Set-Content src/WinNFSd.rc
+
+      - name: Build
+        working-directory: src
+        run: msbuild WinNFSd.sln /p:Configuration=Release /p:Platform=x64 /m
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: WinNFSd
+          path: src/x64/Release/WinNFSd.exe
+          if-no-files-found: error
+
+  test:
+    name: Integration tests (WSL NFS client)
+    runs-on: windows-latest
+    needs: build
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download build
+        uses: actions/download-artifact@v4
+        with:
+          name: WinNFSd
+          path: src/x64/Release
+
+      - name: Disable firewall for NFS test
+        shell: pwsh
+        run: Set-NetFirewallProfile -Profile Domain,Public,Private -Enabled False
+
+      - name: Stage share
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path C:\share | Out-Null
+          Copy-Item -Recurse -Force tests C:\share\
+          $hostIp = (Get-NetIPAddress -AddressFamily IPv4 -PrefixOrigin Dhcp -ErrorAction SilentlyContinue | Select-Object -First 1).IPAddress
+          if (-not $hostIp) { $hostIp = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -notlike '127.*' -and $_.IPAddress -notlike '169.254.*' } | Select-Object -First 1).IPAddress }
+          Write-Host "Windows host IP: $hostIp"
+          "HOST_IP=$hostIp" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+          # Bind WinNFSd explicitly to host IP so WSL2 can reach it.
+          Start-Process -FilePath "${{ github.workspace }}\src\x64\Release\WinNFSd.exe" -ArgumentList "-log off -addr $hostIp C:\share"
+          Start-Sleep -Seconds 5
+          if (-not (Get-Process WinNFSd -ErrorAction SilentlyContinue)) {
+            throw "WinNFSd failed to start"
+          }
+
+      - name: Setup WSL (Ubuntu)
+        uses: Vampire/setup-wsl@v3
+        with:
+          distribution: Ubuntu-22.04
+          additional-packages: nfs-common
+
+      - name: Convert distro to WSL2
+        shell: pwsh
+        run: |
+          wsl --set-version Ubuntu 2
+          wsl --list --verbose
+
+      - name: Diagnose Windows-side listeners
+        shell: pwsh
+        run: |
+          Write-Host "=== WinNFSd process ==="
+          Get-Process WinNFSd -ErrorAction SilentlyContinue | Format-List Id,ProcessName,Path
+          Write-Host "=== Listening UDP ports (111/1058/2049) ==="
+          Get-NetUDPEndpoint -LocalPort 111,1058,2049 -ErrorAction SilentlyContinue | Format-Table
+          Write-Host "=== Windows IPv4 addresses ==="
+          Get-NetIPAddress -AddressFamily IPv4 | Format-Table InterfaceAlias,IPAddress
+          Write-Host "=== WSL IP (from Windows) ==="
+          wsl hostname -I
+
+      - name: Mount + run rename test
+        shell: wsl-bash {0}
+        run: |
+          set -ex
+          HOST_IP='${{ env.HOST_IP }}'
+          echo "HOST_IP=$HOST_IP"
+          ping -c 2 -W 2 "$HOST_IP" || true
+          showmount -e "$HOST_IP" || true
+          sudo mkdir -p /winnfsd
+          sudo mount -vvv -t nfs -o vers=3,nolock,proto=udp,mountproto=udp "${HOST_IP}:/c/share" /winnfsd
+          mount | grep /winnfsd
+          /winnfsd/tests/bash/rename.sh
+
+      - name: Stop WinNFSd
+        if: always()
+        shell: pwsh
+        run: Stop-Process -Name WinNFSd -Force -ErrorAction SilentlyContinue
+
+  release:
+    name: Release artifact on tag
+    runs-on: ubuntu-latest
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: Download build
+        uses: actions/download-artifact@v4
+        with:
+          name: WinNFSd
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: WinNFSd.exe
