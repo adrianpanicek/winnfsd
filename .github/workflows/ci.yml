@@ -62,15 +62,9 @@ jobs:
           name: WinNFSd
           path: src/x64/Release
 
-      - name: Allow WinNFSd through firewall
+      - name: Disable firewall for NFS test
         shell: pwsh
-        run: |
-          foreach ($proto in @('TCP','UDP')) {
-            foreach ($port in @('111','1058','2049')) {
-              netsh advfirewall firewall add rule name="WinNFSd-IN-${proto}-${port}" dir=in action=allow protocol=$proto localport=$port profile=any
-              netsh advfirewall firewall add rule name="WinNFSd-OUT-${proto}-${port}" dir=out action=allow protocol=$proto remoteport=$port profile=any
-            }
-          }
+        run: Set-NetFirewallProfile -Profile Domain,Public,Private -Enabled False
 
       - name: Stage share
         shell: pwsh
