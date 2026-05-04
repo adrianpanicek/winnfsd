@@ -111,6 +111,7 @@ FILE_ITEM CFileTree::AddItem(const char *absolutePath, unsigned char* handle)
 		} else {
 			// Node wasn't found - most likely a new root - add it to the top level.
 			//printf("No parent node found for %s. Adding new sibbling.", absolutePath);
+			delete[] item.path;
 			item.path = new char[strlen(absolutePath) + 1];
 			strcpy_s(item.path, (strlen(absolutePath) + 1), absolutePath);
 			item.nPathLen = strlen(item.path);
@@ -155,6 +156,7 @@ void CFileTree::RenameItem(const char *absolutePathFrom, const char *absolutePat
 
 		std::string sPath(absolutePathTo);
 		std::string splittedPath = sPath.substr(sPath.find_last_of('\\') + 1);
+		delete[] node->data.path;
 		node->data.path = new char[splittedPath.length() + 1];
 		strcpy_s(node->data.path, (splittedPath.length() + 1), splittedPath.c_str());
 
