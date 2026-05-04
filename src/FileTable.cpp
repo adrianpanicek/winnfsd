@@ -1,5 +1,6 @@
 #include "FileTable.h"
 #include "FileTree.h"
+#include "conv.h"
 #include <string.h>
 #include <io.h>
 #include <stdio.h>
@@ -383,9 +384,18 @@ int RenameFile(const char *pathFrom, const char *pathTo)
         return false;
     }
 
-    errno_t errorNumber = rename(pathFrom, pathTo);
+    wchar_t *wPathFrom = _conv_from_utf8(pathFrom);
+    wchar_t *wPathTo = _conv_from_utf8(pathTo);
+    errno_t errorNumber;
+    if (wPathFrom != NULL && wPathTo != NULL) {
+        errorNumber = MoveFileW(wPathFrom, wPathTo) ? 0 : EACCES;
+    } else {
+        errorNumber = EINVAL;
+    }
+    delete[] wPathFrom;
+    delete[] wPathTo;
 
-    if (errorNumber == 0) { //success
+    if (errorNumber == 0) {
 		g_FileTable.RenameFile(pathFrom, pathTo);
         return errorNumber;
     }

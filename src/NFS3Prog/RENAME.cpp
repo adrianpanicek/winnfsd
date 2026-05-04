@@ -30,6 +30,11 @@ nfsstat3 CNFS3Prog::ProcedureRENAME(void)
     std::string fileFromName;
     ReadDirectory(dirFromName, fileFromName);
     char *tmpFrom = GetFullPath(dirFromName, fileFromName);
+    // GetFullPath returns a pointer into a single static buffer, so the next
+    // call would clobber tmpFrom. Snapshot it now.
+    if (tmpFrom != NULL) {
+        strcpy_s(pathFrom, MAXPATHLEN, tmpFrom);
+    }
 
     std::string dirToName;
     std::string fileToName;
@@ -47,8 +52,6 @@ nfsstat3 CNFS3Prog::ProcedureRENAME(void)
         Write(&todir_wcc);
         return stat;
     }
-
-    strcpy_s(pathFrom, MAXPATHLEN, tmpFrom);
 
     fromdir_wcc.before.attributes_follow = GetFileAttributesForNFS(dirFromName.c_str(), &fromdir_wcc.before.attributes);
     todir_wcc.before.attributes_follow = GetFileAttributesForNFS(dirToName.c_str(), &todir_wcc.before.attributes);
