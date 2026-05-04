@@ -113,9 +113,9 @@ jobs:
           HOST_IP='${{ env.HOST_IP }}'
           echo "HOST_IP=$HOST_IP"
           ping -c 2 -W 2 "$HOST_IP" || true
-          rpcinfo -T udp "$HOST_IP" 100000 2 || true
+          showmount -e "$HOST_IP" || true
           sudo mkdir -p /winnfsd
-          sudo mount -vvv -o vers=3,udp,nolock,proto=udp,mountproto=udp "${HOST_IP}:/c/share" /winnfsd
+          sudo mount -vvv -t nfs -o vers=3,nolock,proto=udp,mountproto=udp "${HOST_IP}:/c/share" /winnfsd
           mount | grep /winnfsd
           /winnfsd/tests/bash/rename.sh
 
