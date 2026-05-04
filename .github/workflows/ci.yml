@@ -65,9 +65,12 @@ jobs:
       - name: Allow WinNFSd through firewall
         shell: pwsh
         run: |
-          $exe = "${{ github.workspace }}\src\x64\Release\WinNFSd.exe"
-          netsh advfirewall firewall add rule name="WinNFSd-IN" dir=in action=allow protocol=any program="$exe" profile=any
-          netsh advfirewall firewall add rule name="WinNFSd-OUT" dir=out action=allow protocol=any program="$exe" profile=any
+          foreach ($proto in @('TCP','UDP')) {
+            foreach ($port in @('111','1058','2049')) {
+              netsh advfirewall firewall add rule name="WinNFSd-IN-${proto}-${port}" dir=in action=allow protocol=$proto localport=$port profile=any
+              netsh advfirewall firewall add rule name="WinNFSd-OUT-${proto}-${port}" dir=out action=allow protocol=$proto remoteport=$port profile=any
+            }
+          }
 
       - name: Stage share
         shell: pwsh
