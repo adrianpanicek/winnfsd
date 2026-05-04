@@ -82,12 +82,17 @@ jobs:
             throw "WinNFSd failed to start"
           }
 
-      - name: Setup WSL (Ubuntu, WSL2)
+      - name: Setup WSL (Ubuntu)
         uses: Vampire/setup-wsl@v3
         with:
           distribution: Ubuntu-22.04
-          wsl-version: 2
           additional-packages: nfs-common
+
+      - name: Convert distro to WSL2
+        shell: pwsh
+        run: |
+          wsl --set-version Ubuntu 2
+          wsl --list --verbose
 
       - name: Diagnose Windows-side listeners
         shell: pwsh
